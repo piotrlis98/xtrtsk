@@ -26,31 +26,13 @@ plt.style.use('ggplot')
 load_dotenv()
 
 
-class CustomHelpCommand(commands.HelpCommand):
-    """Provide a better /help command for user."""
-    async def send_bot_help(self, mapping):
-        embed = discord.Embed(title="Available Commands", color=discord.Color.blue())
-        for command in self.context.bot.commands:
-            if not command.hidden:
-                embed.add_field(name=f"/{command.name}", value=command.help or "No description available.",
-                                inline=False)
-        channel = self.get_destination()
-        await channel.send(embed=embed)
-
-    async def send_command_help(self, command):
-        embed = discord.Embed(title=f"Command: /{command.name}",
-                              description=command.help or "No description available.", color=discord.Color.blue())
-        embed.add_field(name="Usage", value=self.get_command_signature(command), inline=False)
-        channel = self.get_destination()
-        await channel.send(embed=embed)
-
-
 class XtrBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.selected_channel = None
         self.interval = '1M'
         self.alert_mode = 'alert'
+        self.last_timestamp = None
         self.session = HTTP(
             testnet=False,
             api_key=os.getenv('BYBIT_API_KEY'),
@@ -60,6 +42,7 @@ class XtrBot(commands.Bot):
     async def fetch_rsi_data(self):
         """Fetch RSI data from Bybit API."""
         try:
+            change = False
             end_time = int(datetime.now().timestamp() * 1000)
             start_time = int(
                 (datetime.now() - timedelta(days={'1d': 1, '1w': 7, '1M': 30}[self.interval])).timestamp() * 1000)
@@ -82,6 +65,12 @@ class XtrBot(commands.Bot):
             if not klines:
                 raise ValueError("No data received from Bybit API")
 
+            if self.last_timestamp is None:
+                self.last_timestamp = klines[0][0]
+            else:
+                if self.last_timestamp < klines[0][0]:
+                    self.last_timestamp = klines[0][0]
+                    change = True
             closing_prices = list(map(float, [kline[4] for kline in klines]))
 
             data = pd.DataFrame(closing_prices, columns=['close'])
@@ -90,7 +79,7 @@ class XtrBot(commands.Bot):
             timestamps = [int(kline[0]) for kline in klines]
             data['Time'] = pd.to_datetime(timestamps[::-1], unit='ms')
 
-            return data
+            return data, change
 
         except Exception as e:
             logger.error(f"Failed to fetch RSI data: {e}")
@@ -99,7 +88,7 @@ class XtrBot(commands.Bot):
     async def plot_rsi(self, data):
         """Plot RSI data and save to a file."""
         plt.figure(figsize=(12, 6))
-        plt.plot(data['Time'], data['RSI'], color='blue', label='RSI (14)')
+        plt.plot(data[0]['Time'], data[0]['RSI'], color='blue', label='RSI (14)')
 
         ax = plt.gca()
 
@@ -112,7 +101,8 @@ class XtrBot(commands.Bot):
 
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
-        plt.title(f'Calculation of Relative Strength Index (RSI) for SOL/Tether (SOLUSDT) for period of {self.interval}')
+        plt.title(
+            f'Calculation of Relative Strength Index (RSI) for SOL/Tether (SOLUSDT) for period of {self.interval}')
         plt.ylabel('RSI Value')
         plt.axhline(y=70, color='r', linestyle='--', label='Overbought (>70)')
         plt.axhline(y=30, color='g', linestyle='--', label='Oversold (<30)')
@@ -123,7 +113,8 @@ class XtrBot(commands.Bot):
         plt.savefig('rsi_plot.png')
         plt.close()
 
-    async def send_rsi_alert(self, channel, current_rsi, checkMode=False):
+    async def send_rsi_alert(self, interaction: discord.Interaction = None, channel=None, current_rsi=None,
+                             checkMode=False):
         """Send RSI alert to the specified channel."""
         await self.plot_rsi(await self.fetch_rsi_data())
 
@@ -143,81 +134,78 @@ class XtrBot(commands.Bot):
             file = discord.File("rsi_plot.png", filename="rsi_plot.png")
             embed.set_image(url="attachment://rsi_plot.png")
 
-            await channel.send(embed=embed, file=file)
+            if interaction:
+                await interaction.followup.send(embed=embed, file=file)  # Send the response using followup.send()
+            else:
+                await channel.send(embed=embed, file=file)  # Send the response directly to the channel
 
 
 intents = discord.Intents.all()
 intents.messages = True
-bot = XtrBot(command_prefix='/', intents=intents, help_command=CustomHelpCommand())
+bot = XtrBot(command_prefix='!', intents=intents)
 
 
-@bot.command(help="Start sending updates to this channel.")
-async def start(ctx):
-    bot.selected_channel = ctx.channel
-    embed = discord.Embed(description=f"Selected this channel for updates: {ctx.channel.name}",
+@bot.tree.command(name='start', description="Start sending updates to this channel.")
+async def start(interaction: discord.Interaction):
+    bot.selected_channel = interaction.channel
+    embed = discord.Embed(description=f"Selected this channel for updates: {interaction.channel.name}",
                           color=discord.Color.green())
-    await ctx.send(embed=embed)
-    await ctx.message.add_reaction("👍🏻")
+    await interaction.response.send_message(embed=embed)
 
 
-@bot.command(help="Stop notifications on this channel.")
-async def stop(ctx):
+@bot.tree.command(name='stop', description="Stop notifications on this channel.")
+async def stop(interaction: discord.Interaction):
     bot.selected_channel = None
     embed = discord.Embed(description="Notifications have been stopped for this channel.", color=discord.Color.red())
-    await ctx.send(embed=embed)
-    await ctx.message.add_reaction("👍🏻")
+    await interaction.response.send_message(embed=embed)
 
 
-@bot.command(help="Check the current RSI.")
-async def check(ctx):
+@bot.tree.command(name='check', description="Check the current RSI.")
+async def check(interaction: discord.Interaction):
+    await interaction.response.defer()
     data = await bot.fetch_rsi_data()
-    current_rsi = data['RSI'].iloc[-1]
-    await bot.send_rsi_alert(ctx.channel, current_rsi, True)
-    await ctx.message.add_reaction("👍🏻")
+    current_rsi = data[0]['RSI'].iloc[-1]
+    await bot.send_rsi_alert(interaction, interaction.channel, current_rsi, True)
 
 
-@bot.command(help="Set the mode for RSI alerts.")
-async def set_mode(ctx):
+async def generic_callback(interaction, attribute_name, description):
+    setattr(bot, attribute_name, interaction.data['values'][0])
+    embed = discord.Embed(description=f"{description}: {getattr(bot, attribute_name)}", color=discord.Color.green())
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name='mode', description="Set the mode for RSI alerts.")
+async def set_mode(interaction: discord.Interaction):
     select = Select(placeholder='Select the mode', options=[
         discord.SelectOption(label='Off', value='off', emoji='🚫', description='Turn off any alerts and reports'),
         discord.SelectOption(label='On', value='on', emoji='✅', description='Turn on hourly reports'),
         discord.SelectOption(label='Alert', value='alert', emoji='🚨', description='Set to alert mode')
     ])
 
-    async def set_mode_callback(interaction):
-        bot.alert_mode = select.values[0]
-        embed = discord.Embed(description=f"Alert mode set to: {bot.alert_mode}", color=discord.Color.green())
-        await interaction.response.send_message(embed=embed)
-
-    select.callback = set_mode_callback
+    select.callback = lambda interaction: generic_callback(interaction, 'alert_mode', 'Alert mode set to')
     view = View()
     view.add_item(select)
 
-    await ctx.send("Choose a mode in the menu below.", view=view)
+    await interaction.response.send_message("Choose a mode in the menu below.", view=view)
 
 
-@bot.command(help="Set the interval for RSI calculation.")
-async def set_interval(ctx):
+@bot.tree.command(name='interval', description="Set the interval for RSI calculation.", )
+async def set_interval(interaction: discord.Interaction):
     select = Select(placeholder='Select the data range you wish to calculate RSI from', options=[
         discord.SelectOption(label='One day', value='1d', emoji='🕙', description='Last 24 hours'),
         discord.SelectOption(label='One week', value='1w', emoji='📅', description='Last week'),
         discord.SelectOption(label='One month', value='1M', emoji='⌛', description='Last month')
     ])
 
-    async def set_interval_callback(interaction):
-        bot.interval = select.values[0]
-        embed = discord.Embed(description=f"You chose: {bot.interval}", color=discord.Color.green())
-        await interaction.response.send_message(embed=embed)
-
-    select.callback = set_interval_callback
+    select.callback = lambda interaction: generic_callback(interaction, 'interval', 'You chose')
     view = View()
     view.add_item(select)
 
-    await ctx.send("Choose a date range in the menu below.", view=view)
+    await interaction.response.send_message("Choose a date range in the menu below.", view=view)
 
 
-@bot.command(help="Display the current configuration summary.")
-async def summary(ctx):
+@bot.tree.command(name='summary', description='Display the current configuration summary.')
+async def summary(interaction: discord.Interaction):
     mode_description = {
         'off': 'No alerts or reports will be sent.',
         'on': 'Hourly reports will be sent.',
@@ -237,39 +225,35 @@ async def summary(ctx):
     embed.add_field(name="Date range", value=f"{interval_description}", inline=False)
     embed.add_field(name="Channel for Alerts", value=f"{channel_description}", inline=False)
 
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
 
 @tasks.loop(seconds=5)
 async def alert_check():
     """Check and send RSI alerts if conditions are met."""
-    try:
-        response = bot.session.get_server_time()
 
-        if 'result' not in response or 'timeSecond' not in response['result']:
-            raise ValueError("Unexpected response format from Bybit API")
+    if bot.selected_channel and bot.alert_mode != 'off':
+        data = await bot.fetch_rsi_data()
 
-        server_time = int(response['result']['timeSecond'])
-        dt = datetime.fromtimestamp(server_time)
+        if data is None:
+            await bot.selected_channel.send("Failed to fetch RSI data. Please try again later.")
+            return
 
-        if bot.selected_channel and bot.alert_mode != 'off' and dt.minute == 0 and 10 >= dt.second >= 5:
-            data = await bot.fetch_rsi_data()
-
-            if data is None:
-                await bot.selected_channel.send("Failed to fetch RSI data. Please try again later.")
-                return
-
-            current_rsi = data['RSI'].iloc[-1]
-            await bot.send_rsi_alert(bot.selected_channel, current_rsi)
-
-    except Exception as e:
-        logger.error(f"Failed to get server time or send alert: {e}")
+        if data[1]:
+            current_rsi = data[0]['RSI'].iloc[-1]
+            await bot.send_rsi_alert(channel=bot.selected_channel, current_rsi=current_rsi)
+        else:
+            return
 
 
 @bot.event
 async def on_ready():
-    """Event handler when the bot is ready."""
     logger.info(f'Logged in as {bot.user}')
+    try:
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} command(s)")
+    except Exception as e:
+        print(e)
     alert_check.start()
 
 
