@@ -47,4 +47,4 @@ ___
 ___
 
 ### Invite the bot to your server
-[CLICK](https://discord.com/oauth2/authorize?client_id=1254165520194867372&permissions=2112&integration_type=0&scope=bot)
+[CLICK](https://discord.com/oauth2/authorize?client_id=1254165520194867372&permissions=2048&integration_type=0&scope=bot)
