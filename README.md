@@ -38,7 +38,7 @@ ___
 - `/start`: Start sending alerts to this channel.
 - `/summary`: Display the current configuration summary. ![Summary](https://i.imgur.com/w8S5xqu.png)
 - `/stop`: Stop notifications on this channel.
-- `/set_interval`: Set the interval (in days) over which the RSI will be calculated (default: last month). ![Set Interval](https://i.imgur.com/3ouCtpt.png)
+- `/interval`: Set the interval (in days) over which the RSI will be calculated (default: last month). ![Set Interval](https://i.imgur.com/3ouCtpt.png)
 - `/help`: Shows available commands.
-- `/set_mode`: Set the mode for RSI alerts (default: alert). ![Set Mode](https://i.imgur.com/ox03yDF.png)
+- `/mode`: Set the mode for RSI alerts (default: alert). ![Set Mode](https://i.imgur.com/ox03yDF.png)
 
