@@ -67,10 +67,10 @@ class XtrBot(commands.Bot):
 
             if self.last_timestamp is None:
                 self.last_timestamp = klines[0][0]
-            else:
-                if self.last_timestamp < klines[0][0]:
-                    self.last_timestamp = klines[0][0]
-                    change = True
+            elif self.last_timestamp < klines[0][0]:
+                self.last_timestamp = klines[0][0]
+                change = True
+                
             closing_prices = list(map(float, [kline[4] for kline in klines]))
 
             data = pd.DataFrame(closing_prices, columns=['close'])
