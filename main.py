@@ -27,7 +27,7 @@ class XtrBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.selected_channel = None  # user can choose the text channel to get alerts on, using /start command
-        self.time_range = '1M'  # let the user choose the date to calculate RSI from, using /interval command
+        self.time_range = '1M'  # let the user choose the date to calculate RSI from, using /timerange command
         self.alert_mode = 'alert'  # user can choose the alert mode, using /mode command
         self.last_timestamp = None  # it will be used to ensure that new kline has been updated by bybit
         self.current_rsi = None
