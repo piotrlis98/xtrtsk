@@ -1,19 +1,16 @@
+import logging
 import os
 from datetime import datetime, timedelta
-import logging
 
 import discord
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
 from discord.ext import tasks, commands
 from discord.ui import Select, View
-
-import pandas as pd
-from ta.momentum import RSIIndicator
-from pybit.unified_trading import HTTP
-
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
 from dotenv import load_dotenv
+from pybit.unified_trading import HTTP
+from ta.momentum import RSIIndicator
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -29,10 +26,11 @@ load_dotenv()
 class XtrBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.selected_channel = None
-        self.interval = '1M'
-        self.alert_mode = 'alert'
-        self.last_timestamp = None
+        self.selected_channel = None  # user can choose the text channel to get alerts on, using /start command
+        self.time_range = '1M'  # let the user choose the date to calculate RSI from, using /interval command
+        self.alert_mode = 'alert'  # user can choose the alert mode, using /mode command
+        self.last_timestamp = None  # it will be used to ensure that new kline has been updated by bybit
+        self.current_rsi = None
         self.session = HTTP(
             testnet=False,
             api_key=os.getenv('BYBIT_API_KEY'),
@@ -45,12 +43,12 @@ class XtrBot(commands.Bot):
             change = False
             end_time = int(datetime.now().timestamp() * 1000)
             start_time = int(
-                (datetime.now() - timedelta(days={'1d': 1, '1w': 7, '1M': 30}[self.interval])).timestamp() * 1000)
+                (datetime.now() - timedelta(days={'1d': 1, '1w': 7, '1M': 30}[self.time_range])).timestamp() * 1000)
 
             response = self.session.get_kline(
                 category="linear",
                 symbol="SOLUSDT",
-                interval=60,  # 24 klines per day
+                interval=60,  # setting for a timeframe, this way we get one kline per hour
                 start=start_time,
                 end=end_time,
                 limit=744  # value from [0-1000]. 744 klines = data from 31 days with timeframe (interval) of 1H
@@ -70,11 +68,12 @@ class XtrBot(commands.Bot):
             elif self.last_timestamp < klines[0][0]:
                 self.last_timestamp = klines[0][0]
                 change = True
-                
+
             closing_prices = list(map(float, [kline[4] for kline in klines]))
 
             data = pd.DataFrame(closing_prices, columns=['close'])
             data['RSI'] = RSIIndicator(data['close'], window=14).rsi()
+            bot.current_rsi = data['RSI'].iloc[-1]
 
             timestamps = [int(kline[0]) for kline in klines]
             data['Time'] = pd.to_datetime(timestamps[::-1], unit='ms')
@@ -97,40 +96,45 @@ class XtrBot(commands.Bot):
             '1d': (mdates.HourLocator(), '%Y-%m-%d %H:%M'),
             '1w': (mdates.DayLocator(), '%Y-%m-%d'),
             '1M': (mdates.WeekdayLocator(), '%Y-%m-%d')
-        }[self.interval]
+        }[self.time_range]
 
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
         plt.title(
-            f'Calculation of Relative Strength Index (RSI) for SOL/Tether (SOLUSDT) for period of {self.interval}')
+            f'Calculation of Relative Strength Index (RSI) for SOL/Tether (SOLUSDT) for period of {self.time_range}')
         plt.ylabel('RSI Value')
         plt.axhline(y=70, color='r', linestyle='--', label='Overbought (>70)')
         plt.axhline(y=30, color='g', linestyle='--', label='Oversold (<30)')
         plt.legend()
         plt.xticks(rotation=45)
         plt.tight_layout()
-
+        plt.annotate(f'{bot.current_rsi:.2f}',
+                     xy=(data[0]['Time'].iloc[-1], bot.current_rsi),
+                     xytext=(data[0]['Time'].iloc[-1], bot.current_rsi + 5),
+                     bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"),
+                     fontsize=12, color='black',
+                     ha='center')
         plt.savefig('rsi_plot.png')
         plt.close()
 
-    async def send_rsi_alert(self, interaction: discord.Interaction = None, channel=None, current_rsi=None,
+    async def send_rsi_alert(self, interaction: discord.Interaction = None, channel=None,
                              checkMode=False):
         """Send RSI alert to the specified channel."""
         await self.plot_rsi(await self.fetch_rsi_data())
 
         if self.alert_mode == 'on' or (
-                self.alert_mode == 'alert' and (current_rsi > 70 or current_rsi < 30)) or checkMode:
-            if current_rsi > 70:
+                self.alert_mode == 'alert' and (bot.current_rsi > 70 or bot.current_rsi < 30)) or checkMode:
+            if bot.current_rsi > 70:
                 title = "RSI Alert - SELL NOW ⚠️"
                 color = discord.Color.red()
-            elif current_rsi < 30:
+            elif bot.current_rsi < 30:
                 title = "RSI Alert - BUY NOW 📈"
                 color = discord.Color.green()
             else:
                 title = "RSI Alert"
                 color = discord.Color.blue()
 
-            embed = discord.Embed(title=title, description=f"Current RSI: **{current_rsi:.2f}**", color=color)
+            embed = discord.Embed(title=title, description=f"Current RSI: **{bot.current_rsi:.2f}**", color=color)
             file = discord.File("rsi_plot.png", filename="rsi_plot.png")
             embed.set_image(url="attachment://rsi_plot.png")
 
@@ -163,9 +167,7 @@ async def stop(interaction: discord.Interaction):
 @bot.tree.command(name='check', description="Check the current RSI.")
 async def check(interaction: discord.Interaction):
     await interaction.response.defer()
-    data = await bot.fetch_rsi_data()
-    current_rsi = data[0]['RSI'].iloc[-1]
-    await bot.send_rsi_alert(interaction, interaction.channel, current_rsi, True)
+    await bot.send_rsi_alert(interaction, interaction.channel, True)
 
 
 async def generic_callback(interaction, attribute_name, description):
@@ -183,25 +185,26 @@ async def set_mode(interaction: discord.Interaction):
     ])
 
     select.callback = lambda interaction: generic_callback(interaction, 'alert_mode', 'Alert mode set to')
+
     view = View()
     view.add_item(select)
 
     await interaction.response.send_message("Choose a mode in the menu below.", view=view)
 
 
-@bot.tree.command(name='interval', description="Set the interval for RSI calculation.", )
-async def set_interval(interaction: discord.Interaction):
+@bot.tree.command(name='timerange', description="Set the time range for RSI calculation.", )
+async def set_timerange(interaction: discord.Interaction):
     select = Select(placeholder='Select the data range you wish to calculate RSI from', options=[
         discord.SelectOption(label='One day', value='1d', emoji='🕙', description='Last 24 hours'),
         discord.SelectOption(label='One week', value='1w', emoji='📅', description='Last week'),
         discord.SelectOption(label='One month', value='1M', emoji='⌛', description='Last month')
     ])
 
-    select.callback = lambda interaction: generic_callback(interaction, 'interval', 'You chose')
+    select.callback = lambda interaction: generic_callback(interaction, 'time_range', 'You chose')
     view = View()
     view.add_item(select)
 
-    await interaction.response.send_message("Choose a date range in the menu below.", view=view)
+    await interaction.response.send_message("Choose a time range in the menu below.", view=view)
 
 
 @bot.tree.command(name='summary', description='Display the current configuration summary.')
@@ -212,17 +215,17 @@ async def summary(interaction: discord.Interaction):
         'alert': 'Reports will be sent based on RSI thresholds.'
     }.get(bot.alert_mode, 'Unknown')
 
-    interval_description = {
+    timerange_description = {
         '1d': 'Last 24 hours.',
         '1w': 'Last week.',
         '1M': 'Last month.'
-    }.get(bot.interval, 'Unknown')
+    }.get(bot.time_range, 'Unknown')
 
     channel_description = bot.selected_channel.name if bot.selected_channel else 'None selected'
 
     embed = discord.Embed(title="Current Configuration Summary", color=discord.Color.blue())
     embed.add_field(name="Alert Mode", value=f"{bot.alert_mode.capitalize()} ({mode_description})", inline=False)
-    embed.add_field(name="Date range", value=f"{interval_description}", inline=False)
+    embed.add_field(name="Time range", value=f"{timerange_description}", inline=False)
     embed.add_field(name="Channel for Alerts", value=f"{channel_description}", inline=False)
 
     await interaction.response.send_message(embed=embed)
@@ -240,8 +243,7 @@ async def alert_check():
             return
 
         if data[1]:
-            current_rsi = data[0]['RSI'].iloc[-1]
-            await bot.send_rsi_alert(channel=bot.selected_channel, current_rsi=current_rsi)
+            await bot.send_rsi_alert(channel=bot.selected_channel)
         else:
             return
 
