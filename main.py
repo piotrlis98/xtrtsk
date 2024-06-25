@@ -46,7 +46,7 @@ class XtrBot(commands.Bot):
                 (datetime.now() - timedelta(days={'1d': 1, '1w': 7, '1M': 30}[self.time_range])).timestamp() * 1000)
 
             response = self.session.get_kline(
-                category="linear",
+                category="spot",
                 symbol="SOLUSDT",
                 interval=60,  # setting for a timeframe, this way we get one kline per hour
                 start=start_time,
