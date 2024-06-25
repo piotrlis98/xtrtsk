@@ -9,6 +9,10 @@ Welcome to a Discord bot designed for monitoring and alerting Relative Strength 
 
 ### Running the bot with Docker:
 
+> [!IMPORTANT]  
+> Bot is already running on a Oracle VPS server.
+> For testing, scroll down to the bottom of this instruction and invite the bot to your server.
+
 0. **Clone or download this repository and navigate to the project directory**.
 
 1. **Ensure Docker is running on your device.**
@@ -46,7 +50,8 @@ ___
 - `/summary`: Display the current configuration summary. ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/2adb9d6d-418a-43e5-b772-24f1df62d2e4)
 - `/stop`: Stop notifications on this channel.
 - `/timerange`: Set the time range over which the RSI will be calculated (default: last month). ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/9ec457b6-a4fd-4ad9-94f2-3f7586d601ff)
-- `/mode`: Set the mode for RSI alerts (default: alert). ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/e66fcd9b-cbe3-4a88-855e-8dc8656a9b76)
+- `/mode`: Set the mode for RSI alerts (default: alert). \
+  ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/e66fcd9b-cbe3-4a88-855e-8dc8656a9b76)
 
 ___
 
