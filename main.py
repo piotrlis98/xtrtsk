@@ -73,7 +73,7 @@ class XtrBot(commands.Bot):
 
             data = pd.DataFrame(closing_prices, columns=['close'])
             data['RSI'] = RSIIndicator(data['close'], window=14).rsi()
-            bot.current_rsi = data['RSI'].iloc[-1]
+            self.current_rsi = data['RSI'].iloc[-1]
 
             timestamps = [int(kline[0]) for kline in klines]
             data['Time'] = pd.to_datetime(timestamps[::-1], unit='ms')
@@ -108,9 +108,9 @@ class XtrBot(commands.Bot):
         plt.legend()
         plt.xticks(rotation=45)
         plt.tight_layout()
-        plt.annotate(f'{bot.current_rsi:.2f}',
-                     xy=(data[0]['Time'].iloc[-1], bot.current_rsi),
-                     xytext=(data[0]['Time'].iloc[-1], bot.current_rsi + 5),
+        plt.annotate(f'{self.current_rsi:.2f}',
+                     xy=(data[0]['Time'].iloc[-1], self.current_rsi),
+                     xytext=(data[0]['Time'].iloc[-1], self.current_rsi + 5),
                      bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"),
                      fontsize=12, color='black',
                      ha='center')
@@ -123,18 +123,18 @@ class XtrBot(commands.Bot):
         await self.plot_rsi(await self.fetch_rsi_data())
 
         if self.alert_mode == 'on' or (
-                self.alert_mode == 'alert' and (bot.current_rsi > 70 or bot.current_rsi < 30)) or checkMode:
-            if bot.current_rsi > 70:
+                self.alert_mode == 'alert' and (self.current_rsi > 70 or self.current_rsi < 30)) or checkMode:
+            if self.current_rsi > 70:
                 title = "RSI Alert - SELL NOW ⚠️"
                 color = discord.Color.red()
-            elif bot.current_rsi < 30:
+            elif self.current_rsi < 30:
                 title = "RSI Alert - BUY NOW 📈"
                 color = discord.Color.green()
             else:
                 title = "RSI Alert"
                 color = discord.Color.blue()
 
-            embed = discord.Embed(title=title, description=f"Current RSI: **{bot.current_rsi:.2f}**", color=color)
+            embed = discord.Embed(title=title, description=f"Current RSI: **{self.current_rsi:.2f}**", color=color)
             file = discord.File("rsi_plot.png", filename="rsi_plot.png")
             embed.set_image(url="attachment://rsi_plot.png")
 
@@ -210,21 +210,21 @@ async def set_timerange(interaction: discord.Interaction):
 @bot.tree.command(name='summary', description='Display the current configuration summary.')
 async def summary(interaction: discord.Interaction):
     mode_description = {
-        'off': 'No alerts or reports will be sent.',
-        'on': 'Hourly reports will be sent.',
-        'alert': 'Reports will be sent based on RSI thresholds.'
+        'off': 'no alerts or reports will be sent',
+        'on': 'hourly reports will be sent',
+        'alert': 'reports will be sent based on RSI thresholds'
     }.get(bot.alert_mode, 'Unknown')
 
     timerange_description = {
-        '1d': 'Last 24 hours.',
+        '1d': 'Last day.',
         '1w': 'Last week.',
         '1M': 'Last month.'
     }.get(bot.time_range, 'Unknown')
 
-    channel_description = bot.selected_channel.name if bot.selected_channel else 'None selected'
+    channel_description = bot.selected_channel.name if bot.selected_channel else 'None selected.'
 
     embed = discord.Embed(title="Current Configuration Summary", color=discord.Color.blue())
-    embed.add_field(name="Alert Mode", value=f"{bot.alert_mode.capitalize()} ({mode_description})", inline=False)
+    embed.add_field(name="Alert Mode", value=f"__{bot.alert_mode.capitalize()}__ - {mode_description}.", inline=False)
     embed.add_field(name="Time range", value=f"{timerange_description}", inline=False)
     embed.add_field(name="Channel for Alerts", value=f"{channel_description}", inline=False)
 
