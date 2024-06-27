@@ -45,11 +45,14 @@ ___
 
 ### Available commands overview:
 
-- `/check`: Check the current RSI. ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/c339b303-0714-4bcf-b064-c9193a9d68f7)
+- `/check`: Check the current RSI. \
+ ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/c339b303-0714-4bcf-b064-c9193a9d68f7)
 - `/start`: Start sending alerts to this channel.
-- `/summary`: Display the current configuration summary. ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/2adb9d6d-418a-43e5-b772-24f1df62d2e4)
+- `/summary`: Display the current configuration summary. \
+ ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/b1a782bd-dd1e-4bad-a035-2045a1db9c08)
 - `/stop`: Stop notifications on this channel.
-- `/timerange`: Set the time range over which the RSI will be calculated (default: last month). ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/9ec457b6-a4fd-4ad9-94f2-3f7586d601ff)
+- `/timerange`: Set the time range over which the RSI will be calculated (default: last month). \
+ ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/9ec457b6-a4fd-4ad9-94f2-3f7586d601ff)
 - `/mode`: Set the mode for RSI alerts (default: alert). \
   ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/e66fcd9b-cbe3-4a88-855e-8dc8656a9b76)
 
