@@ -58,7 +58,7 @@ class XtrBot(commands.Bot):
             if 'result' not in response or 'list' not in response['result']:
                 raise ValueError("Unexpected response format from Bybit API")
 
-            klines = response['result']['list']
+            klines = response['result']['list'][1:]  # consider only closed candles for an RSI calculation
 
             if not klines:
                 raise ValueError("No data received from Bybit API")
@@ -110,10 +110,11 @@ class XtrBot(commands.Bot):
         plt.tight_layout()
         plt.annotate(f'{self.current_rsi:.2f}',
                      xy=(data[0]['Time'].iloc[-1], self.current_rsi),
-                     xytext=(data[0]['Time'].iloc[-1], self.current_rsi + 5),
+                     xytext=(8, 0),
+                     textcoords='offset points',
                      bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"),
                      fontsize=12, color='black',
-                     ha='center')
+                     ha='left', va='center')
         plt.savefig('rsi_plot.png')
         plt.close()
 
