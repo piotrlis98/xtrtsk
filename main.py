@@ -16,9 +16,6 @@ from ta.momentum import RSIIndicator
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Set matplotlib style
-plt.style.use('ggplot')
-
 # Load environment variables
 load_dotenv()
 
@@ -86,6 +83,7 @@ class XtrBot(commands.Bot):
 
     async def plot_rsi(self, data):
         """Plot RSI data and save to a file."""
+        plt.style.use('ggplot')
         plt.figure(figsize=(12, 6))
         plt.plot(data[0]['Time'], data[0]['RSI'], color='blue', label='RSI (14)')
 
