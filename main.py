@@ -66,14 +66,14 @@ class XtrBot(commands.Bot):
                 self.last_timestamp = klines[0][0]
                 change = True
 
-            closing_prices = list(map(float, [kline[4] for kline in klines]))
+            closing_prices = list(map(float, [kline[4] for kline in klines]))[::-1]
 
             data = pd.DataFrame(closing_prices, columns=['close'])
             data['RSI'] = RSIIndicator(data['close'], window=14).rsi()
             self.current_rsi = data['RSI'].iloc[-1]
 
-            timestamps = [int(kline[0]) for kline in klines]
-            data['Time'] = pd.to_datetime(timestamps[::-1], unit='ms')
+            timestamps = [int(kline[0]) for kline in klines][::-1]
+            data['Time'] = pd.to_datetime(timestamps, unit='ms')
 
             return data, change
 
