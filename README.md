@@ -46,7 +46,7 @@ ___
 ### Available commands overview:
 
 - `/check`: Check the current RSI. \
- ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/419a6224-36a9-4480-afb3-37baf9b13bd4)
+ ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/741da3bc-4cb8-4441-9795-8d5c004ca3c1)
 - `/start`: Start sending alerts to this channel.
 - `/summary`: Display the current configuration summary. \
  ![image](https://github.com/piotrlis98/xtrtsk/assets/31008706/b1a782bd-dd1e-4bad-a035-2045a1db9c08)
